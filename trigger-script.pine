@@ -1,0 +1,47 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Nyo
+
+//@version=6
+indicator("Footprint Trigger", overlay=true)
+
+// === SET TIMEFRAME ===
+oiTimeframe = timeframe.period
+anchorInput = switch
+    timeframe.isseconds => "1H"
+    timeframe.isintraday => "1D"
+    timeframe.isdaily => "1D"
+    timeframe.isweekly => "1W"
+    timeframe.ismonthly => "1M"
+    => "1D"
+    
+var lowerTimeframe = switch
+    timeframe.isseconds => "1S"
+    timeframe.isintraday => "1"
+    timeframe.isdaily => "5"
+    => "60"
+
+// === OPEN INTEREST ===
+oiTicker = str.format("{0}_OI", ticker.standard(syminfo.tickerid))
+oiClose = request.security(oiTicker, oiTimeframe, close, ignore_invalid_symbol=true)
+oiPrevClose = request.security(oiTicker, oiTimeframe, close[1], ignore_invalid_symbol=true)
+oiUp = oiClose > oiPrevClose
+oiColor = oiUp ? color.blue : color.red
+
+// === CUMULATIVE VOLUME DELTA ===
+import TradingView/ta/8
+[openVol, maxVol, minVol, lastVol] = ta.requestVolumeDelta(lowerTimeframe, anchorInput)
+
+// DEFINE
+cvdChange = lastVol - openVol
+
+buyerTrapped = cvdChange > 0 and close < open  
+sellerTrapped = cvdChange < 0 and close > open 
+
+// === COLORS ===
+candleColor = oiUp and buyerTrapped ? color.red :  
+              oiUp and sellerTrapped ? color.green : 
+              buyerTrapped ? color.yellow :  
+              sellerTrapped ? color.blue : 
+              na
+
+barcolor(candleColor)
